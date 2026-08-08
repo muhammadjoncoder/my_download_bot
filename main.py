@@ -5,7 +5,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 from yt_dlp import YoutubeDL
 from aiohttp import web
 
-TOKEN = "8627549326:AAFSVDJjlehaaLZEvN2v5g0KIxtTjtvrd_zY"
+TOKEN = "8667354291:AAGk9cAoCPyDi7rV0TwrakE1lCCJNiD-aGw"
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
