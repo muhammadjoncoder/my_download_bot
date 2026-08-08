@@ -3,8 +3,9 @@ import os
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from yt_dlp import YoutubeDL
+from aiohttp import web
 
-TOKEN = "8667354291:AAGk9cAoCPyDi7rV0TwrakE1lCCJNiD-aGw"
+TOKEN = "8627549326:AAFSVDJjlehaaLZEvN2v5g0KIxtTjtvrd_zY"
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
@@ -63,7 +64,6 @@ async def handle_links(message: Message):
     user_id = message.from_user.id
     lang = user_languages.get(user_id, "tg")
     user_links[user_id] = message.text.strip()
-    
     await message.answer(TEXTS[lang]["choose_format"], reply_markup=get_format_keyboard())
 
 @dp.callback_query(F.data.startswith("fmt_"))
@@ -84,7 +84,7 @@ async def download_file(callback: CallbackQuery):
         ydl_opts = {'format': 'best[ext=mp4]/best', 'outtmpl': f'video_{user_id}.%(ext)s'}
     elif fmt_type == "low":
         ydl_opts = {'format': 'worst[ext=mp4]/worst', 'outtmpl': f'video_{user_id}.%(ext)s'}
-    else: # mp3
+    else:
         ydl_opts = {
             'format': 'bestaudio/best',
             'outtmpl': f'audio_{user_id}.%(ext)s',
@@ -113,7 +113,21 @@ async def download_file(callback: CallbackQuery):
         print(f"Хатогӣ: {e}")
         await status_msg.edit_text(TEXTS[lang]["error"])
 
+# Веб-сервери хурд барои фиреб додани Render
+async def handle_web(request):
+    return web.Response(text="Bot is running!")
+
+async def start_web():
+    app = web.Application()
+    app.router.add_get("/", handle_web)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 10000))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+
 async def main():
+    await start_web()  # Сар кардани веб-сервер
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
