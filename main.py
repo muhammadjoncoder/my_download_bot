@@ -1,9 +1,8 @@
 import asyncio
 import os
+import aiohttp
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from yt_dlp import YoutubeDL
-from aiohttp import web
 
 TOKEN = "8667354291:AAGk9cAoCPyDi7rV0TwrakE1lCCJNiD-aGw"
 bot = Bot(token=TOKEN)
@@ -11,18 +10,18 @@ dp = Dispatcher()
 
 TEXTS = {
     "ru": {
-        "welcome": "Салом Хуш Омадед! Выберите язык / Забонро интихоб кунед:",
+        "welcome": "Салом! Выберите язык / Забонро интихоб кунед:",
         "set_lang": "Язык изменен на русский! Отправьте ссылку на видео.",
         "choose_format": "Выберите формат для скачивания:",
         "processing": "Загружаю файл, подождите...",
-        "error": "Произошла ошибка при загрузке. Возможно, файл слишком большой."
+        "error": "Произошла ошибка при загрузке. Возможно, линк неверный или файл слишком большой."
     },
     "tg": {
-        "welcome": "Салом Хуш Омадед! Выберите язык / Забонро интихоб кунед:",
+        "welcome": "Салом! Выберите язык / Забонро интихоб кунед:",
         "set_lang": "Забон ба тоҷикӣ тағйир ёфт! Линки видеоро биристед.",
         "choose_format": "Формати боргириро интихоб кунед:",
         "processing": "Файл боргирӣ шуда истодааст, андаке сабр кунед...",
-        "error": "Ҳангоми боргирӣ хатогӣ рӯй дод. Шояд файл хеле калон бошад."
+        "error": "Ҳангоми боргирӣ хатогӣ рӯй дод. Шояд линк хато бошад ё файл хеле калон аст."
     }
 }
 
@@ -80,44 +79,45 @@ async def download_file(callback: CallbackQuery):
     status_msg = await callback.message.answer(TEXTS[lang]["processing"])
     await callback.answer()
     
-    if fmt_type == "high":
-        ydl_opts = {'format': 'best[ext=mp4]/best', 'outtmpl': f'video_{user_id}.%(ext)s'}
-    elif fmt_type == "low":
-        ydl_opts = {'format': 'worst[ext=mp4]/worst', 'outtmpl': f'video_{user_id}.%(ext)s'}
-    else:
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': f'audio_{user_id}.%(ext)s',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-        }
+    # Истифодаи API-сервери ройгони устувор барои скачать кардани видео/аудио
+    api_url = f"https://dreadful-dev.pro{url}"
     
-    try:
-        with YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-            if fmt_type == "mp3" and not filename.endswith(".mp3"):
-                filename = os.path.splitext(filename)[0] + ".mp3"
-        
-        if os.path.exists(filename):
-            if fmt_type == "mp3":
-                await callback.message.answer_audio(audio=open(filename, 'rb'))
-            else:
-                await callback.message.answer_video(video=open(filename, 'rb'))
-            os.remove(filename)
-            await status_msg.delete()
-    except Exception as e:
-        print(f"Хатогӣ: {e}")
-        await status_msg.edit_text(TEXTS[lang]["error"])
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(api_url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    if data.get("status") == "success":
+                        file_url = ""
+                        # Интихоби линк вобаста ба тугмаи пахшшуда
+                        if fmt_type == "mp3":
+                            file_url = data.get("audio_url")
+                        elif fmt_type == "low":
+                            file_url = data.get("video_low_url") or data.get("video_url")
+                        else:
+                            file_url = data.get("video_url")
+                            if file_url:
+                                      if fmt_type == "mp3":
+                                await callback.message.answer_audio(audio=file_url)
+                            else:
+                                await callback.message.answer_video(video=file_url)
+                            await status_msg.delete()
+                            return
+                            
+                    await status_msg.edit_text(TEXTS[lang]["error"])
+                else:
+                    await status_msg.edit_text(TEXTS[lang]["error"])
+        except Exception as e:
+            print(f"Хатогӣ: {e}")
+            await status_msg.edit_text(TEXTS[lang]["error"])
 
-# Веб-сервери хурд барои фиреб додани Render
+# Веб-сервери оддӣ барои Render
+from aiohttp import web
 async def handle_web(request):
-    return web.Response(text="Bot is running!")
+    return web.Response(text="Bot is online!")
 
-async def start_web():
+async def main():
     app = web.Application()
     app.router.add_get("/", handle_web)
     runner = web.AppRunner(app)
@@ -125,10 +125,8 @@ async def start_web():
     port = int(os.environ.get("PORT", 10000))
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
-
-async def main():
-    await start_web()  # Сар кардани веб-сервер
+    
     await dp.start_polling(bot)
 
-if __name__ == "__main__":
+if name == "main":
     asyncio.run(main())
